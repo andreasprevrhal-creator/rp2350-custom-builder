@@ -4,6 +4,8 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # Aktiviert Node 24 Support
     steps:
       - name: Checkout MicroPython
         uses: actions/checkout@v4
@@ -12,7 +14,9 @@ jobs:
           submodules: true
 
       - name: Install Dependencies
-        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi build-essential python3
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi build-essential python3 libnewlib-arm-none-eabi
 
       - name: Build mpy-cross
         run: make -C mpy-cross
@@ -27,11 +31,11 @@ jobs:
           # 2. QMI & PSRAM Support aktivieren
           echo "#define MICROPY_HW_QMI_SUPPORT (1)" >> $BOARD_DIR/mpconfigboard.h
           
-          # 3. WLAN Support (WICHTIG: CYW43 explizit für RP2350)
+          # 3. WLAN Support (CYW43 für RP2350)
           echo "#define MICROPY_PY_NETWORK_CYW43 (1)" >> $BOARD_DIR/mpconfigboard.h
           
-          # 4. PIO-Ressourcen Management (verhindert Konflikt)
-          # Wir erzwingen, dass CYW43 eine eigene PIO-Instanz bekommt
+          # 4. PIO-Ressourcen Konflikt lösen
+          # Zwingt WLAN auf PIO 1, damit PSRAM auf PIO 0/QMI ungestört bleibt
           echo "#define CYW43_PIO_INSTANCE 1" >> $BOARD_DIR/mpconfigboard.h
           
           # 5. Architektur-Fix für RP2350B
@@ -39,7 +43,6 @@ jobs:
 
       - name: Build Firmware
         run: |
-          # BOARD_VARIANT=rp2350 ist entscheidend für den B-Chip
           make -C ports/rp2 BOARD=RPI_PICO2_W BOARD_VARIANT=rp2350
 
       - name: Upload Artifact
